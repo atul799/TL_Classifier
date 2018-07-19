@@ -1,0 +1,134 @@
+#############################################################
+#work directory has the setup for:
+#1. tensorflow models from rep (use object_detection from research directory)
+#2. ssd_inception_v2_coco trained model from TF model zoo
+#3. img dataset frim sim and real testtrack for training
+#4. config (sim and testtrack)
+#5. pbtxt
+#############################################################
+
+
+github.com/tensorflow/models/blob/mastger/research/object_detection/g3doc/intallation.md
+
+###Steps######
+
+###Step 0
+#setup work directory
+mkdir work
+cd work
+
+
+###Step 1. get models from tf repos
+
+git clone https://github.com/tensorflow/models.git
+cd models
+git checkout f7e99c0
+
+###Step 2. run protoc
+
+#Step 2.1 setup protocol buffers
+sudo apt-get install protobuf-compiler
+cd research/
+
+protoc object_detection/protos/*.proto --python_out=.
+
+#Step 2.2 add the path of the slim directory to PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
+
+#Step 2.3 test with model builder script
+python object_detection/builders/model_builder_test.py
+
+###Step 3. get labeled dataset
+##go back to work directory (root of this project)
+cd ../../
+mkdir data
+
+## using dataset from previous udacity batch cohorts:
+
+mkdir data
+cd data
+
+
+#Vatsal Srivastava -->
+## simulator: 280
+## testtrack: 710     325 Green,186 Red,131 yellow,6 Unknown https://github.com/coldKnight/TrafficLight_Detection-TensorFlowAPI#get-the-dataset
+#Alex lechner --> 
+##simulator data :488 (145 Green,268 Red,10 Yellow,65 Unknown)
+## testtrack data:155  (mix of green and yelow)
+https://www.dropbox.com/s/vaniv8eqna89r20/alex-lechner-udacity-traffic-light-dataset.zip?dl=0
+
+
+wget https://www.dropbox.com/s/vaniv8eqna89r20/alex-lechner-udacity-traffic-light-dataset.zip?dl=0
+unzip alex-lechner-udacity-traffic-light-dataset.zip?dl=0
+
+#The above data comes with .record file (TFRecord)
+#also included in data directory is a label_map.pbtxt file
+
+
+###Step 4: Download ss_inception_v2_coco trained model (42ms) from tensor flow modelzoo
+cd ../work
+mkdir coco_model
+
+wget http://download.tensorflow.org/models/object_detection/ssd_inception_v2_coco_2018_01_28.tar.gz
+tar -xvzf ssd_inception_v2_coco_2018_01_28.tar.gz
+##Can also try ss_mobilenet_v2_coco (27 ms)
+
+###Step 5: Change .config file
+##config file needs change in terms of classes(num_classes) 4 in our case
+##PATH_TO_BE_CONFIGURED at fine_tune_checkpoint (ckpt file),input_path and label_map_path(pbtxt file) in train_input_reader and eval_input_reader section
+##change max_detections_per_class: 50 and max_total_detections:50
+##set num_steps to 10000 (default is 200000)
+## num_examples to 480 in eval_config section
+
+cd ssd_inception_v2_coco_2018_01_28
+cp pipeline.config pipeline.config.orig
+
+##Create 2 configs, 1 for sim images re-training and another for testtrack images retraining
+#creating configs in a separate directory at root as the paths can be passed to train.py
+mkdir ../../configs
+
+
+cp pipeline.config ../../configs/simulator_trg.config
+
+cp pipeline.config ../../configs/testtrack_trg.config
+
+cd ../../configs
+
+##Edit config files
+
+
+###Step 6: run train.py from TF
+Copy the file train.py from the models/research/object_detection/train.py folder to the root (work)
+cd ../work
+cp models/research/object_detection/train.py .
+
+
+##Create directories to store finetuned models
+mkdir trained_models
+mkdir trained_models/simulator
+mkdir trained_models/testtrack
+
+
+
+
+
+##with simulator data training
+python train.py --logtostderr --train_dir=trained_models/simulator --pipeline_config_path=./configs/simulator_trg.config
+
+##with testtrack data training
+python train.py --logtostderr --train_dir=trained_models/testtrack --pipeline_config_path=./configs/testtrack_trg.config
+
+###Step 7 Freeze trained graph tensorflow 1.4 or higher needed
+copy export_inference_graph.py to root directory ( work)
+
+cp models/research/object_detection/export_inference_graph.py .
+
+#simulator
+python export_inference_graph.py --input_type image_tensor --pipeline_config_path =./configs/simulator_trg.config --trained_checkpoint_prefix=./trained_models/simulator/model.ckpt-20000 --output_directory trained_models
+
+##testtrack
+python export_inference_graph.py --input_type image_tensor --pipeline_config_path =./configs/testtrack_trg.config --trained_checkpoint_prefix=./trained_models/testtrack/model.ckpt-20000 --output_directory trained_models
+
+
+
+look for frozen_inference_graph.pb

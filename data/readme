@@ -1,0 +1,7 @@
+real_data.record and sim_data.record from vs
+real_training_data and sim_training_data from vs
+
+jpg_simulator_train.record and udacity_train.record from alex
+simulator_dataset_rgb and udacity_testarea_rgb from alex
+
+label_map.pbtxt pbtext
